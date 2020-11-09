@@ -105,5 +105,5 @@ radioTX.write(&data, sizeof(data));
 if (data[3]<350) power.sleep(SLEEP_FOREVER);
 
 
-power.sleepDelay(31000);
+power.sleepDelay(32000);
 }
