@@ -6,13 +6,13 @@
  - Temperature sensor DS18B20
  - 433 MHz radio transmitter (FS1000A)
 
- Autor: V. Nezlo 
+ Autor: V.Nezlo
  E-mail: vlladimirka@gmail.com
  Github: https://github.com/V-Nezlo
 
 */
 
-#include <iarduino_RF433_Transmitter.h>               
+#include <iarduino_RF433_Transmitter.h>
 #include <OneWire.h>
 #include <GyverPower.h>
 
@@ -27,20 +27,20 @@ int k;
 
 
 void check_sensors(void){
-	
+
 ds.reset();
 ds.write(0xCC);
 ds.write(0x44);
 
-delay(1000); 
+delay(1000);
 
 ds.reset();
-ds.write(0xCC); 
+ds.write(0xCC);
 ds.write(0xBE);
 
 data[0] = ds.read();
-data[1] = ds.read(); 
-  
+data[1] = ds.read();
+
 float temperature =  ((data[1] << 8) | data[0]) * 0.0625;
 
 tempout=temperature*10;
@@ -57,13 +57,13 @@ long readVcc() {
     ADMUX = _BV(MUX3) | _BV(MUX2);
   #else
     ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
-  #endif  
+  #endif
 
   delay(75); // Wait for Vref to settle
   ADCSRA |= _BV(ADSC); // Start conversion
   while (bit_is_set(ADCSRA,ADSC)); // measuring
 
-  uint8_t low  = ADCL; // must read ADCL first - it then locks ADCH  
+  uint8_t low  = ADCL; // must read ADCL first - it then locks ADCH
   uint8_t high = ADCH; // unlocks both
 
   long result = (high<<8) | low;
@@ -73,9 +73,9 @@ long readVcc() {
 }
 
 void setup(){
-  
-  radioTX.begin(1000);                                                    
-  radioTX.openWritingPipe(5);   
+
+  radioTX.begin(1000);
+  radioTX.openWritingPipe(5);
   power.setSleepMode(POWERDOWN_SLEEP);
   power.hardwareDisable(PWR_ADC);
   power.hardwareDisable(PWR_SPI);
@@ -97,13 +97,13 @@ data[3]=(readVcc())/10;   //voltage
 power.hardwareDisable(PWR_ADC);
 
 radioTX.write(&data, sizeof(data));
-radioTX.write(&data, sizeof(data)); 
-radioTX.write(&data, sizeof(data)); 
-radioTX.write(&data, sizeof(data)); 
+radioTX.write(&data, sizeof(data));
+radioTX.write(&data, sizeof(data));
+radioTX.write(&data, sizeof(data));
 radioTX.write(&data, sizeof(data));
 
 if (data[3]<350) power.sleep(SLEEP_FOREVER);
 
 
-power.sleepDelay(3000);
+power.sleepDelay(31000);
 }
