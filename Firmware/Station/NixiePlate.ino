@@ -1,6 +1,6 @@
 /*
   Weather station based on NIXIE lamps
-  Ver 6.4
+  Ver 6.5
 
   Hardware required:
  - Temperature sensor DS18B20
@@ -31,7 +31,7 @@ DHT dht(2, DHT11);	//DHT11 (or another) pin
 
 int tempin;  		// temp*10 
 int tempout;  	    // out temp *10
-int voltage;    // voltage of receiver' battery
+int voltage;    // sensor battery voltage
 char tempin_z; 		// + or - on indicators
 char tempout_z;     // + or - on indicators
 int humi;           // humidity
@@ -83,9 +83,9 @@ void radio_init(void){
 }
 
 void check_radio(void){
-    if(radioRX.available(&k)){                         //If buffer has something
-    radioRX.read(&data, sizeof(data));                 //Read in data[]
-	if (data[1]==ADDRESS)							   //Address checking
+    if(radioRX.available(&k)){              //If buffer has something
+    radioRX.read(&data, sizeof(data));      //Read in data[]
+	if (data[1]==ADDRESS)							        //Address checking
 		{
 		
 		if (farenheit) tempout=(data[2]*1.8)+320;      //F=C*1,8+32
@@ -381,7 +381,7 @@ void displayMode(void){
     if (Tcathode_switch.isReady()) P++; 
     if (P>9) 
     {
-      display_mode = display_mode_temp;
+      display_mode = display_mode_temp; //restore mode after healing
       Tmode_switch.resume();
       //Serial.println("Display mode restored");
       P=0;

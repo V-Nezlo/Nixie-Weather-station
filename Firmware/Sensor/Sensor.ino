@@ -1,6 +1,6 @@
 /*
   Outside sensor for NIXIE Thermometer
-  Ver 2.1
+  Ver 2.2
 
   Hardware required:
  - Temperature sensor DS18B20
