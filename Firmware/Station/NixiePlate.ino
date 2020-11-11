@@ -17,6 +17,7 @@
 #include <iarduino_RF433_Receiver.h>                      
 iarduino_RF433_Receiver    radioRX(3);                    
 int data[4];
+int ds_data[2];
 uint8_t k;
 #define ADDRESS 111
 //radio
@@ -267,11 +268,11 @@ void conversion_read(void){
   ds.reset(); // 
   ds.write(0xCC); 
   ds.write(0xBE);
-  data[0] = ds.read();
-  data[1] = ds.read(); 
+  ds_data[0] = ds.read();
+  ds_data[1] = ds.read(); 
    //Serial.println("Im done");
  
-  float temperature =  ((data[1] << 8) | data[0]) * 0.0625;
+  float temperature =  ((ds_data[1] << 8) | ds_data[0]) * 0.0625;
 
   if (farenheit) tempin=(temperature*18)+320;
   else tempin=temperature*10;

@@ -23,6 +23,7 @@ iarduino_RF433_Transmitter radioTX(12);
 
 int tempout;
 int data[4];
+int ds_data[2];
 int k;
 
 
@@ -38,10 +39,10 @@ ds.reset();
 ds.write(0xCC);
 ds.write(0xBE);
 
-data[0] = ds.read();
-data[1] = ds.read();
+ds_data[0] = ds.read();
+ds_data[1] = ds.read();
 
-float temperature =  ((data[1] << 8) | data[0]) * 0.0625;
+float temperature =  ((ds_data[1] << 8) | ds_data[0]) * 0.0625;
 
 tempout=temperature*10;
 }
