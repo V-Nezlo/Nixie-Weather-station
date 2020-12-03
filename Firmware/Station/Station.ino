@@ -1,11 +1,12 @@
 /*
-  Weather station based on NIXIE lamps
-  Ver 6.5
+  Weather IOT station based on NIXIE lamps
+  Ver 0.1
 
   Hardware required:
  - Temperature sensor DS18B20
  - Humidity sensor DHT11 (DHT12,DHT21,DHT22)
  - 433 MHz radio receiver (MX-RM-5V)
+ - ESP8266 on TX-RX
 
  Autor: V. Nezlo 
  E-mail: vlladimirka@gmail.com
@@ -22,6 +23,7 @@ uint8_t k;
 #define ADDRESS 111
 //radio
 
+#include <EasyTS.h>
 #include <OneWire.h>
 #include "DHT.h"
 #include <GyverTimer.h>                  
@@ -39,6 +41,7 @@ int digits[4];      // nums
 char display_mode;  //mode
 char display_mode_temp; //for cathode healing
 char P=0; //for carhode healing
+int sendmode;
 
   bool connection=0; 			//connection flag
   bool farenheit; 				//celsium or farenheit
@@ -73,6 +76,7 @@ GTimer Tcathode_switch(MS, 500);//cathode healing switch time
 GTimer Tled_lowbat(MS, 300);//led switching (low battery)
 GTimer Tled_noconn(MS, 800);//led switching (noconnection)
 GTimer Tvalidate_radio(MS, 600000); //time to validate data
+GTimer Tsend_data(MS,15000); //ThingSpeak send data timer
 
 const int bright = 1;  					// Value of "bright" of indicators
 
@@ -102,9 +106,8 @@ void check_radio(void){
 		
 		//dot1f = 1;
 		
-		connection=TRUE;
+		connection=true;
 		Tvalidate_radio.reset();
-		//Serial.println("Connection established");
 		}
 	
     }
@@ -113,9 +116,7 @@ void check_radio(void){
 void check_validate_radio(void){
 if (Tvalidate_radio.isReady())
 	{
-		connection=FALSE;
-		//Serial.print("Connection lost and value is ");
-		//Serial.println(connection);
+		connection=false;
 	}
 }
 
@@ -225,11 +226,10 @@ void pin_set(void){
 }
 
 void led_blinking(void){
-if (connection==FALSE) {
+if (connection==false) {
     if (Tled_noconn.isReady())
 	{
 		dot1f = !dot1f;
-		//Serial.println("blink!");
 	} 
   }
 else if (voltage<370){
@@ -253,8 +253,6 @@ void check_sensors_first(void){
 void check_humidity(void){
   float h = dht.readHumidity();
   humi=h*10;
-  //Serial.print("Humidity is ");
-  //Serial.println(humi);
 }
 
 void conversion_start(void){
@@ -264,13 +262,11 @@ void conversion_start(void){
 }
 
 void conversion_read(void){
-  //Serial.println("Im start lagging boiii");
   ds.reset(); // 
   ds.write(0xCC); 
   ds.write(0xBE);
   ds_data[0] = ds.read();
   ds_data[1] = ds.read(); 
-   //Serial.println("Im done");
  
   float temperature =  ((ds_data[1] << 8) | ds_data[0]) * 0.0625;
 
@@ -283,8 +279,6 @@ void conversion_read(void){
   if (tempin>0) tempin_z = 7;
   else tempin_z = 8;
 
-  //Serial.print("In temperature is ");
-  //Serial.println(tempin);
 }
 
 void displayMode(void){
@@ -383,7 +377,6 @@ void displayMode(void){
     {
       display_mode = display_mode_temp; //restore mode after healing
       Tmode_switch.resume();
-      //Serial.println("Display mode restored");
       P=0;
     }  
   }
@@ -394,7 +387,6 @@ void displayMode(void){
 void switchMode(void){
 if (Tmode_switch.isReady())
   {
-    //Serial.println("Display mode switched");
     switch (display_mode)
     {
       case 0:
@@ -410,7 +402,6 @@ if (Tmode_switch.isReady())
       break;
 
       case 2:
-	  //Serial.println("Current mode is out,switching to in");
       display_mode=0;
 	  delay(30);
       break;
@@ -425,14 +416,37 @@ void cathodeHeal(void){
     display_mode_temp = display_mode;//save display_mode value
     display_mode=3;
     Tmode_switch.stop();
-    //Serial.println("Cathode healing enable");
   }
 
 }
 
+void iot_senddata(){
+char String_senddata[30];
+   if (Tsend_data.isReady()){
+    switch(sendmode){
+        case 0:
+        sprintf (String_senddata, "%u.%u", tempin/10, tempin%10); 
+        easyts.send("VF5VWODQICAG5BG3", 1, String_senddata);
+        sendmode=1;
+        break;
+        case 1:
+        sprintf (String_senddata, "%d", humi); 
+        easyts.send("VF5VWODQICAG5BG3", 2, String_senddata);
+        sendmode=2;
+        break;
+        case 2:
+        sprintf (String_senddata, "%u.%u", tempout/10, tempout%10); 
+        easyts.send("VF5VWODQICAG5BG3", 3, String_senddata);
+        sendmode=0;
+        break;
+        }
+    }
+}
+
 void setup(){
 
-  Serial.begin(9600);
+  Serial.begin(115200);
+  easyts.std_connect("Nokia 7.1","12345678");
   radio_init();
   pin_set();
   dht.begin();
@@ -440,11 +454,7 @@ void setup(){
   check_sensors_first();//first run with delay
   check_humidity();
   farenheit = digitalRead(A0);
-  
 
-  //Serial.print("farenheit is ");
-  //Serial.println(farenheit);
-  
   display_mode=0;
 }
   
@@ -455,6 +465,7 @@ void loop(){
   check_validate_radio();
   led_blinking();
   cathodeHeal();
+  iot_senddata();
 }
 
 
