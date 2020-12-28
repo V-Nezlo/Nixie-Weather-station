@@ -2,7 +2,12 @@
 
 ![alt text](image.jpg "Result")​
 
-The weather station is based on the indicators IN-12 and IN-15A. Displays indoor temperature, indoor humidity and outdoor temperature. The outside temperature is taken from a remote sensor located outside.
-The whole project is made in Proteus 8.10, all the necessary files are available. The firmware was written using the 433_transaver library and Alex Gyver's libraries.
-It is possible to display both degrees Celsius and degrees Fahrenheit (by closing the jumper).
-In the absence of a signal from the remote sensor, the upper indicator blinks slowly. When the battery voltage is low, the upper indicator flashes quickly, but the temperature is displayed. Above 100 Fahrenheit, no decimal point is displayed.
+Погодная станция построена на индикаторах ИН-12 и ИН-15А (для точек используется ИНС-1)
+Отображает температуру внутри помещения, влажность внутри помещения и температуру с выносного датчика, размещаемого на улице.
+Есть возможность отображения температуры в цельсиях и фаренгейтах (фаренгейты включаются замыканием перемычки)
+Связь с датчиком отображается через верхний индикатор, если он мигает медленно - нет связи, не мигает - связь установлена, мигает быстро - батарея разряжена и требует замены(зарядки)
+
+Сборка простая, но нужно учитывать что после установки переходного разъема рядом с К155ИД1 теряется возможность прошивки ардуино через usb, прошивать либо перед установкой разъема, либо через ICSP.
+Настройка заключается в установке 180В на выходе преобразователя, для измерения напряжения есть специальные контакты, подписанные +180V и земля. Настройка производится путем вращения многооборотного резистора.
+
+

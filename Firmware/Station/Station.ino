@@ -1,12 +1,11 @@
 /*
-  Weather IOT station based on NIXIE lamps
-  Ver 0.1
+  Погодная станция на NIXIE индикаторах
+  Ver 6.6
 
-  Hardware required:
- - Temperature sensor DS18B20
- - Humidity sensor DHT11 (DHT12,DHT21,DHT22)
- - 433 MHz radio receiver (MX-RM-5V)
- - ESP8266 on TX-RX
+  Требуемые железки:
+ - Температурный датчик DS18B20
+ - Датчик влажности DHT11 (DHT12,DHT21,DHT22)
+ - 433 MHz радио-приемник (MX-RM-5V)
 
  Autor: V. Nezlo 
  E-mail: vlladimirka@gmail.com
@@ -14,71 +13,65 @@
 
 */
 
-//radio
-#include <iarduino_RF433_Receiver.h>                      
-iarduino_RF433_Receiver    radioRX(3);                    
-int data[4];
-int ds_data[2];
-uint8_t k;
-#define ADDRESS 111
-//radio
-
-#include <EasyTS.h>
+#include <iarduino_RF433_Receiver.h> 
 #include <OneWire.h>
 #include "DHT.h"
 #include <GyverTimer.h>                  
 
-OneWire ds(5); 		//ds18b20 pin 
-DHT dht(2, DHT11);	//DHT11 (or another) pin 
+OneWire ds(5); 		//ds18b20 пин
+DHT dht(2, DHT11);	//DHT пин
+iarduino_RF433_Receiver radioRX(3); //пин для радио (обязательно с хардварным прерыванием!)
+#define ADDRESS 112
+int data[4];
+int ds_data[2];
+uint8_t k;    
 
-int tempin;  		// temp*10 
-int tempout;  	    // out temp *10
-int voltage;    // sensor battery voltage
-char tempin_z; 		// + or - on indicators
-char tempout_z;     // + or - on indicators
-int humi;           // humidity
-int digits[4];      // nums
-char display_mode;  //mode
-char display_mode_temp; //for cathode healing
-char P=0; //for carhode healing
-int sendmode;
+int tempin;  		         //температура*10
+int tempout;  	         //температура снаружи *10
+int voltage;             //Напряжение аккума внешнего датчика
+char tempin_z; 		       //+ или - на первом индикаторе для внутренней температуры
+char tempout_z;          //+ или - на первом индикаторе для внешней температуры
+int humi;                //влажности
+int digits[4];           //массив для цифр
+char display_mode;       //режим
+char display_mode_temp;  //тут храним режим при лечении катодов
+char P=0;                //переменная для лечения
 
-  bool connection=0; 			//connection flag
-  bool farenheit; 				//celsium or farenheit
+  bool connection=0; 			//флаг наличия соединения
+  bool farenheit; 				//цельсии или фаренгейты
   bool farenheit_overload_in;   //flag for "carry" in
   bool farenheit_overload_out;  //flag for "carry" out
   
-  const int out1 = A3;  //Decoder pin 1
-  const int out2 = A1;  //Decoder pin 2
-  const int out3 = 13;  //Decoder pin 3
-  const int out4 = A2;  //Decoder pin 4
+  const int out1 = A3;  //Пины декодера
+  const int out2 = A1;  
+  const int out3 = 13;  
+  const int out4 = A2;  
 
-  const int key1 = 9; 	//Anode pin 1
-  const int key2 = 12; 	//Anode pin 2
-  const int key3 = 10;	//Anode pin 3
-  const int key4 = 11;	//Anode pin 4
+  const int key1 = 9; 	//Пины для анодов
+  const int key2 = 12; 	
+  const int key3 = 10;	
+  const int key4 = 11;	
 
-  const int dot = 4; 	//Dot inside the lamp
-  const int dot1= 6; 	//Dot of internal temp
-  const int dot2= 7; 	//Dot of internal humi
-  const int dot3= 8; 	//Dot of external temp
+  const int dot = 4; 	//Точка внутри лампы
+  const int dot1= 6; 	//Точка внутренней температуры
+  const int dot2= 7; 	//Точка внутренней влажности
+  const int dot3= 8; 	//Точка внешней температуры
 
-  bool dotf  =1;   //flags
+  bool dotf  =1;   //флаги точек
   bool dot1f =0;
   bool dot2f =0;
   bool dot3f =0;
 
-GTimer Tconv_start(MS,1000);//Start conversion in ds18
-GTimer Tconv_read(MS,2000); //Read from ds18 time
-GTimer Tmode_switch(MS,6000); //switch mode time
-GTimer Tcathode_heal(MS,180000);//cathode healing time
-GTimer Tcathode_switch(MS, 500);//cathode healing switch time
-GTimer Tled_lowbat(MS, 300);//led switching (low battery)
-GTimer Tled_noconn(MS, 800);//led switching (noconnection)
-GTimer Tvalidate_radio(MS, 600000); //time to validate data
-GTimer Tsend_data(MS,15000); //ThingSpeak send data timer
+GTimer Tconv_start(MS,1000);//Таймер начала конверсии в ds18
+GTimer Tconv_read(MS,2000); //Таймер чтения температуры с ds18
+GTimer Tmode_switch(MS,6000); //Таймер переключения режимов
+GTimer Tcathode_heal(MS,180000);//Таймер для лечения катодов
+GTimer Tcathode_switch(MS, 500);//Таймер для смены катодов во время лечения
+GTimer Tled_lowbat(MS, 300);//Частота мигания индикатора при низком напряжении датчика
+GTimer Tled_noconn(MS, 800);//Частота мигания индикатора при отсутствии соединения
+GTimer Tvalidate_radio(MS, 600000); //Таймер для проверки валидации
 
-const int bright = 1;  					// Value of "bright" of indicators
+const int bright = 1;  					//"Яркость" индикаторов
 
 void radio_init(void){
 	radioRX.begin(1000);                                  
@@ -87,9 +80,9 @@ void radio_init(void){
 }
 
 void check_radio(void){
-    if(radioRX.available(&k)){              //If buffer has something
-    radioRX.read(&data, sizeof(data));      //Read in data[]
-	if (data[1]==ADDRESS)							        //Address checking
+    if(radioRX.available(&k)){              //Если в буфере что-то есть
+    radioRX.read(&data, sizeof(data));      //Записать в массив
+	if (data[1]==ADDRESS)							        //Проверить адрес
 		{
 		
 		if (farenheit) tempout=(data[2]*1.8)+320;      //F=C*1,8+32
@@ -104,23 +97,24 @@ void check_radio(void){
 		if (tempout>0) tempout_z = 7;
 		else tempout_z = 8;
 		
-		//dot1f = 1;
-		
+    if (tempout<0) tempout = tempout * (-1);
 		connection=true;
 		Tvalidate_radio.reset();
+		//Serial.println("Соединение установлено");
 		}
 	
-    }
+  }
 }
 
 void check_validate_radio(void){
 if (Tvalidate_radio.isReady())
 	{
 		connection=false;
+		//Serial.print("Соединение потеряно");
 	}
 }
 
-void setNumber(int num) { // Transfer number to the decoder
+void setNumber(int num) { //Передача цифр в декодер
   switch (num)
   {
     case 0:
@@ -186,7 +180,7 @@ void setNumber(int num) { // Transfer number to the decoder
   }
 }
 
-void show(int a[]){ //Set numbers on indicators
+void show(int a[]){ //Установка разрядов
 	int keys[] = { key1, key2, key3, key4 };
 	for (int i=0; i<4; ++i){
 		setNumber(a[i]);
@@ -230,6 +224,7 @@ if (connection==false) {
     if (Tled_noconn.isReady())
 	{
 		dot1f = !dot1f;
+		//Serial.println("мырг!");
 	} 
   }
 else if (voltage<370){
@@ -253,12 +248,14 @@ void check_sensors_first(void){
 void check_humidity(void){
   float h = dht.readHumidity();
   humi=h*10;
+  //Serial.print("Влажность: ");
+  //Serial.println(humi);
 }
 
 void conversion_start(void){
-  ds.reset(); 	  // ALL RESET
-  ds.write(0xCC); // Skip device search
-  ds.write(0x44); // Start conversion
+  ds.reset(); 	  // Ресет
+  ds.write(0xCC); // Пропуск скана шины
+  ds.write(0x44); // Начать конверсию
 }
 
 void conversion_read(void){
@@ -279,6 +276,8 @@ void conversion_read(void){
   if (tempin>0) tempin_z = 7;
   else tempin_z = 8;
 
+  //Serial.print("Температура внутри ");
+  //Serial.println(tempin);
 }
 
 void displayMode(void){
@@ -375,8 +374,9 @@ void displayMode(void){
     if (Tcathode_switch.isReady()) P++; 
     if (P>9) 
     {
-      display_mode = display_mode_temp; //restore mode after healing
+      display_mode = display_mode_temp; //Вернуть режим после лечения катодов
       Tmode_switch.resume();
+      //Serial.println("Режим отображения восстановлен");
       P=0;
     }  
   }
@@ -387,6 +387,7 @@ void displayMode(void){
 void switchMode(void){
 if (Tmode_switch.isReady())
   {
+    //Serial.println("Режим отображения изменен");
     switch (display_mode)
     {
       case 0:
@@ -413,48 +414,29 @@ void cathodeHeal(void){
  if (Tcathode_heal.isReady())
   {
     Tmode_switch.reset();
-    display_mode_temp = display_mode;//save display_mode value
+    display_mode_temp = display_mode;//Сохраняем текущий режим отображения
     display_mode=3;
     Tmode_switch.stop();
+    //Serial.println("Cathode healing enable");
   }
 
 }
 
-void iot_senddata(){
-char String_senddata[30];
-   if (Tsend_data.isReady()){
-    switch(sendmode){
-        case 0:
-        sprintf (String_senddata, "%u.%u", tempin/10, tempin%10); 
-        easyts.send("VF5VWODQICAG5BG3", 1, String_senddata);
-        sendmode=1;
-        break;
-        case 1:
-        sprintf (String_senddata, "%d", humi); 
-        easyts.send("VF5VWODQICAG5BG3", 2, String_senddata);
-        sendmode=2;
-        break;
-        case 2:
-        sprintf (String_senddata, "%u.%u", tempout/10, tempout%10); 
-        easyts.send("VF5VWODQICAG5BG3", 3, String_senddata);
-        sendmode=0;
-        break;
-        }
-    }
-}
-
 void setup(){
 
-  Serial.begin(115200);
-  easyts.std_connect("Nokia 7.1","12345678");
+  Serial.begin(9600);
   radio_init();
   pin_set();
   dht.begin();
   delay(300);
-  check_sensors_first();//first run with delay
+  check_sensors_first();//Первый запуск с делеем
   check_humidity();
   farenheit = digitalRead(A0);
+  
 
+  //Serial.print("Флаг фаренгейтов равен ");
+  //Serial.println(farenheit);
+  
   display_mode=0;
 }
   
@@ -465,10 +447,4 @@ void loop(){
   check_validate_radio();
   led_blinking();
   cathodeHeal();
-  iot_senddata();
 }
-
-
-
-
-

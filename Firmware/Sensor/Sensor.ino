@@ -1,10 +1,10 @@
 /*
-  Outside sensor for NIXIE Thermometer
+  Внешний датчик для NIXIE погодной станции
   Ver 2.2
 
-  Hardware required:
- - Temperature sensor DS18B20
- - 433 MHz radio transmitter (FS1000A)
+  Требуемые железки:
+ - Температурный датчик DS18B20
+ - 433 MHz радио передатчик (FS1000A)
 
  Autor: V.Nezlo
  E-mail: vlladimirka@gmail.com
@@ -47,7 +47,7 @@ float temperature =  ((ds_data[1] << 8) | ds_data[0]) * 0.0625;
 tempout=temperature*10;
 }
 
-long readVcc() {
+long readVcc() { //Кусок, взятый из интернетов
   // Read 1.1V reference against AVcc
   // set the reference to Vcc and the measurement to the internal 1.1V reference
   #if defined(__AVR_ATmega32U4__) || defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
@@ -77,26 +77,27 @@ void setup(){
 
   radioTX.begin(1000);
   radioTX.openWritingPipe(5);
-  power.setSleepMode(POWERDOWN_SLEEP);
-  power.hardwareDisable(PWR_ADC);
-  power.hardwareDisable(PWR_SPI);
-  power.hardwareDisable(PWR_I2C);
-  power.hardwareDisable(PWR_UART0);
-  power.bodInSleep(false);
+  power.setSleepMode(POWERDOWN_SLEEP);  //Максимум энергоэффективности во сне
+  power.hardwareDisable(PWR_ADC);       //Минус АЦП
+  power.hardwareDisable(PWR_SPI);       //Минус SPI
+  power.hardwareDisable(PWR_I2C);       //Минут TWI
+  power.hardwareDisable(PWR_UART0);     //Минус UART
+  power.bodInSleep(false);              //Минус супервизор питания во сне
 }
 
 void loop(){
 
 delay(100);
 check_sensors();
-data[0]=123;	//dumbass
-data[1]=ADDRESS;//address
-data[2]=tempout;//temperature
+data[0]=123;	//Заглушка
+data[1]=ADDRESS;//Адрес
+data[2]=tempout;//Температура
 
 power.hardwareEnable(PWR_ADC);
-data[3]=(readVcc())/10;   //voltage
+data[3]=(readVcc())/10;   //Напряжение
 power.hardwareDisable(PWR_ADC);
 
+//Отправляем 5 раз для надежности
 radioTX.write(&data, sizeof(data));
 radioTX.write(&data, sizeof(data));
 radioTX.write(&data, sizeof(data));

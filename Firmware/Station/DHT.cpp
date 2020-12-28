@@ -119,8 +119,9 @@ boolean DHT::read(void) {
   
   // pull the pin high and wait 250 milliseconds
   digitalWrite(_pin, HIGH);
-  delay(50);
-
+  //*****************************************************************************************
+  delay(50); // Вот это можно менять
+  //*****************************************************************************************
   // now pull it low for ~20 milliseconds
   pinMode(_pin, OUTPUT);
   digitalWrite(_pin, LOW);
