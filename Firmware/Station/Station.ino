@@ -94,7 +94,7 @@ void check_radio(void){
 		voltage=data[3];
 		
 		
-		if (tempout>0) tempout_z = 7;
+		if (tempout>=0) tempout_z = 7;
 		else tempout_z = 8;
 		
     if (tempout<0) tempout = tempout * (-1);

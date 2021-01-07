@@ -16,7 +16,7 @@
 #include <OneWire.h>
 #include <GyverPower.h>
 
-#define ADDRESS 111
+#define ADDRESS 112
 
 OneWire ds(3);
 iarduino_RF433_Transmitter radioTX(12);
@@ -107,5 +107,5 @@ radioTX.write(&data, sizeof(data));
 if (data[3]<350) power.sleep(SLEEP_FOREVER);
 
 
-power.sleepDelay(30000);
+power.sleepDelay(360000);
 }
