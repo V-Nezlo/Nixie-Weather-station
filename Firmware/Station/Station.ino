@@ -1,11 +1,11 @@
 /*
   Погодная станция на NIXIE индикаторах
-  Ver 6.6
+  Ver 6.6 - Ответвление - Версия без внешнего датчика и барометром
 
   Требуемые железки:
  - Температурный датчик DS18B20
  - Датчик влажности DHT11 (DHT12,DHT21,DHT22)
- - 433 MHz радио-приемник (MX-RM-5V)
+ - BMP280 датчик давления
 
  Autor: V. Nezlo 
  E-mail: vlladimirka@gmail.com
@@ -13,34 +13,28 @@
 
 */
 
-#include <iarduino_RF433_Receiver.h> 
 #include <OneWire.h>
 #include "DHT.h"
-#include <GyverTimer.h>                  
+#include <GyverTimer.h>          
+#include <Adafruit_BMP280.h>  
 
 OneWire ds(5); 		//ds18b20 пин
 DHT dht(2, DHT11);	//DHT пин
-iarduino_RF433_Receiver radioRX(3); //пин для радио (обязательно с хардварным прерыванием!)
-#define ADDRESS 112
-int data[4];
-int ds_data[2];
-uint8_t k;    
+Adafruit_BMP280 bmp;
 
+int ds_data[2];
 int tempin;  		         //температура*10
-int tempout;  	         //температура снаружи *10
-int voltage;             //Напряжение аккума внешнего датчика
+int pressure;
 char tempin_z; 		       //+ или - на первом индикаторе для внутренней температуры
-char tempout_z;          //+ или - на первом индикаторе для внешней температуры
+
 int humi;                //влажности
 int digits[4];           //массив для цифр
 char display_mode;       //режим
 char display_mode_temp;  //тут храним режим при лечении катодов
 char P=0;                //переменная для лечения
 
-  bool connection=0; 			//флаг наличия соединения
   bool farenheit; 				//цельсии или фаренгейты
   bool farenheit_overload_in;   //flag for "carry" in
-  bool farenheit_overload_out;  //flag for "carry" out
   
   const int out1 = A3;  //Пины декодера
   const int out2 = A1;  
@@ -57,6 +51,8 @@ char P=0;                //переменная для лечения
   const int dot2= 7; 	//Точка внутренней влажности
   const int dot3= 8; 	//Точка внешней температуры
 
+  const int bright = 1;  					//"Яркость" индикаторов
+
   bool dotf  =1;   //флаги точек
   bool dot1f =0;
   bool dot2f =0;
@@ -67,52 +63,6 @@ GTimer Tconv_read(MS,2000); //Таймер чтения температуры �
 GTimer Tmode_switch(MS,6000); //Таймер переключения режимов
 GTimer Tcathode_heal(MS,180000);//Таймер для лечения катодов
 GTimer Tcathode_switch(MS, 500);//Таймер для смены катодов во время лечения
-GTimer Tled_lowbat(MS, 300);//Частота мигания индикатора при низком напряжении датчика
-GTimer Tled_noconn(MS, 800);//Частота мигания индикатора при отсутствии соединения
-GTimer Tvalidate_radio(MS, 600000); //Таймер для проверки валидации
-
-const int bright = 1;  					//"Яркость" индикаторов
-
-void radio_init(void){
-	radioRX.begin(1000);                                  
-    radioRX.openReadingPipe (5);                          
-    radioRX.startListening  ();   
-}
-
-void check_radio(void){
-    if(radioRX.available(&k)){              //Если в буфере что-то есть
-    radioRX.read(&data, sizeof(data));      //Записать в массив
-	if (data[1]==ADDRESS)							        //Проверить адрес
-		{
-		
-		if (farenheit) tempout=(data[2]*1.8)+320;      //F=C*1,8+32
-		else tempout=data[2];                            
-		
-		if (tempout>1000) farenheit_overload_out=1;
-		else farenheit_overload_out=0;
-		
-		voltage=data[3];
-		
-		
-		if (tempout>=0) tempout_z = 7;
-		else tempout_z = 8;
-		
-    if (tempout<0) tempout = tempout * (-1);
-		connection=true;
-		Tvalidate_radio.reset();
-		//Serial.println("Соединение установлено");
-		}
-	
-  }
-}
-
-void check_validate_radio(void){
-if (Tvalidate_radio.isReady())
-	{
-		connection=false;
-		//Serial.print("Соединение потеряно");
-	}
-}
 
 void setNumber(int num) { //Передача цифр в декодер
   switch (num)
@@ -219,17 +169,18 @@ void pin_set(void){
   digitalWrite (key4,HIGH);
 }
 
-void led_blinking(void){
-if (connection==false) {
-    if (Tled_noconn.isReady())
-	{
-		dot1f = !dot1f;
-		//Serial.println("мырг!");
-	} 
-  }
-else if (voltage<370){
-     if (Tled_lowbat.isReady()) dot1f = !dot1f;
-  }
+void baro_start(void){
+  bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,   // Режим работы
+                Adafruit_BMP280::SAMPLING_X2,     // Точность изм. температуры
+                Adafruit_BMP280::SAMPLING_X16,    // Точность изм. давления
+                Adafruit_BMP280::FILTER_X16,      // Уровень фильтрации
+                Adafruit_BMP280::STANDBY_MS_500); // Период просыпания, мСек
+}
+
+void baro_check(void){
+  double raw_pressure = bmp.readPressure(); //измеряем давление
+  raw_pressure = raw_pressure * 0,00750062; //переводим в мм рт. ст.
+  pressure = raw_pressure;                  //неявно преобразуем в int, убирая дробную часть
 }
 
 void check_sensors(void){
@@ -248,8 +199,6 @@ void check_sensors_first(void){
 void check_humidity(void){
   float h = dht.readHumidity();
   humi=h*10;
-  //Serial.print("Влажность: ");
-  //Serial.println(humi);
 }
 
 void conversion_start(void){
@@ -276,8 +225,6 @@ void conversion_read(void){
   if (tempin>0) tempin_z = 7;
   else tempin_z = 8;
 
-  //Serial.print("Температура внутри ");
-  //Serial.println(tempin);
 }
 
 void displayMode(void){
@@ -306,9 +253,7 @@ void displayMode(void){
   digits[3] = tempin%100/10;
 
   dotf=0;
-  if (connection){
-	if (voltage>=370) dot1f=0;
-	}
+  dot1f=0;
   dot2f=0;
   dot3f=1;
   }
@@ -321,44 +266,25 @@ void displayMode(void){
   digits[3] = humi%10; 
 
   dotf=1;
-  if (connection){
-	if (voltage>=370) dot1f=0;
-	}
+  dot1f=0;
   dot2f=1;
   dot3f=0;
   }
 
-  if ((display_mode==2)&(farenheit_overload_out==0))
+  if (display_mode==2)
   {
-  digits[0] = tempout_z; // + -
-  digits[1] = tempout/100; 
-  digits[2] = tempout%100/10; 
-  digits[3] = tempout%10; 
+  digits[0] = 3; // P
+  digits[1] = pressure/100; 
+  digits[2] = pressure%100/10; 
+  digits[3] = pressure%10; 
 
   dotf=1;
-  if (connection){
-	if (voltage>=370) dot1f=1;
-	}
+	dot1f=1;
   dot2f=0;
   dot3f=0;
   }
   
-    if ((display_mode==2)&(farenheit_overload_out==1))
-  {
-  digits[0] = tempout_z; // + -
-  digits[1] = tempout/1000; 
-  digits[2] = tempout%1000/100; 
-  digits[3] = tempout%100/10; 
-
-  dotf=0;
-  if (connection){
-	if (voltage>=370) dot1f=1;
-	}
-  dot2f=0;
-  dot3f=0;
-  }
-
-    if (display_mode==3)
+  if (display_mode==3)
   {
 
   digits[0] = P;
@@ -376,7 +302,6 @@ void displayMode(void){
     {
       display_mode = display_mode_temp; //Вернуть режим после лечения катодов
       Tmode_switch.resume();
-      //Serial.println("Режим отображения восстановлен");
       P=0;
     }  
   }
@@ -387,7 +312,6 @@ void displayMode(void){
 void switchMode(void){
 if (Tmode_switch.isReady())
   {
-    //Serial.println("Режим отображения изменен");
     switch (display_mode)
     {
       case 0:
@@ -396,15 +320,15 @@ if (Tmode_switch.isReady())
       break;
 
       case 1:
-      if (connection) display_mode=2;
-      else display_mode=0;
-      check_sensors();
+      display_mode=2;
+      baro_check();
       delay(30);
       break;
 
       case 2:
       display_mode=0;
-	  delay(30);
+      check_sensors();
+	    delay(30);
       break;
     }
   }
@@ -417,7 +341,7 @@ void cathodeHeal(void){
     display_mode_temp = display_mode;//Сохраняем текущий режим отображения
     display_mode=3;
     Tmode_switch.stop();
-    //Serial.println("Cathode healing enable");
+
   }
 
 }
@@ -425,7 +349,6 @@ void cathodeHeal(void){
 void setup(){
 
   Serial.begin(9600);
-  radio_init();
   pin_set();
   dht.begin();
   delay(300);
@@ -433,18 +356,11 @@ void setup(){
   check_humidity();
   farenheit = digitalRead(A0);
   
-
-  //Serial.print("Флаг фаренгейтов равен ");
-  //Serial.println(farenheit);
-  
   display_mode=0;
 }
   
 void loop(){
   switchMode();
   displayMode();
-  check_radio();
-  check_validate_radio();
-  led_blinking();
   cathodeHeal();
 }
